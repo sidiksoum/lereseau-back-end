@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="fr">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Vérification de votre compte LeRéseau</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: 'Segoe UI', Arial, sans-serif;
+      background: #f0f4f8;
+      color: #1a202c;
+    }
+
+    .wrapper {
+      max-width: 580px;
+      margin: 40px auto;
+      background: hsl(0, 0%, 100%);
+      border-radius: 16px;
+      overflow: hidden;
+      box-shadow: 0 4px 24px rgba(0, 0, 0, 0.10);
+    }
+
+    .header {
+      background: linear-gradient(135deg, #1a56db 0%, #7e3af2 100%);
+      padding: 36px 40px;
+      text-align: center;
+    }
+
+    .header img {
+      height: 40px;
+      margin-bottom: 12px;
+    }
+
+    .header h1 {
+      color: #ffffff;
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.3px;
+    }
+
+    .header p {
+      color: rgba(255, 255, 255, 0.80);
+      font-size: 13px;
+      margin-top: 4px;
+    }
+
+    .body {
+      padding: 36px 40px;
+    }
+
+    .greeting {
+      font-size: 16px;
+      font-weight: 600;
+      margin-bottom: 12px;
+    }
+
+    .text {
+      font-size: 14px;
+      color: #4a5568;
+      line-height: 1.7;
+      margin-bottom: 24px;
+    }
+
+    .otp-box {
+      background: #f7f8ff;
+      border: 2px dashed #7e3af2;
+      border-radius: 12px;
+      text-align: center;
+      padding: 28px 20px;
+      margin: 28px 0;
+    }
+
+    .otp-label {
+      font-size: 12px;
+      color: #7e3af2;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1.5px;
+      margin-bottom: 12px;
+    }
+
+    .otp-code {
+      font-size: 42px;
+      font-weight: 800;
+      letter-spacing: 10px;
+      color: #1a56db;
+      font-family: 'Courier New', monospace;
+    }
+
+    .otp-expire {
+      font-size: 12px;
+      color: #718096;
+      margin-top: 10px;
+    }
+
+    .warning {
+      background: #fff5f5;
+      border-left: 4px solid #fc8181;
+      border-radius: 6px;
+      padding: 12px 16px;
+      font-size: 13px;
+      color: #742a2a;
+      margin-bottom: 24px;
+      line-height: 1.6;
+    }
+
+    .footer {
+      background: #f7f8ff;
+      padding: 24px 40px;
+      text-align: center;
+      border-top: 1px solid #e2e8f0;
+    }
+
+    .footer p {
+      font-size: 12px;
+      color: #a0aec0;
+      line-height: 1.7;
+    }
+
+    .footer a {
+      color: #1a56db;
+      text-decoration: none;
+    }
+
+    .brand {
+      font-weight: 800;
+      background: linear-gradient(90deg, #1a56db, #7e3af2);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+  </style>
+</head>
+
+<body>
+  <div class="wrapper">
+    <!-- En-tête -->
+    <div class="header">
+      <h1>🌐 <span style="color:#fff;">Le</span><span style="color:#c4b5fd;">Réseau</span></h1>
+      <p>La plateforme n°1 du réseautage académique</p>
+    </div>
+
+    <!-- Corps -->
+    <div class="body">
+      <p class="greeting">Bonjour {{ first_name }} 👋</p>
+      <p class="text">
+        Bienvenue sur <strong>LeRéseau</strong> ! Pour finaliser la création de votre compte,
+        veuillez entrer le code de vérification ci-dessous dans l'application.
+      </p>
+
+      <div class="otp-box">
+        <div class="otp-label">🔐 Votre code de vérification</div>
+        <div class="otp-code">{{ otp_code }}</div>
+        <div class="otp-expire">⏱ Ce code expire dans <strong>{{ expire_minutes }} minutes</strong></div>
+      </div>
+
+      <div class="warning">
+        ⚠️ <strong>Ne partagez jamais ce code</strong> avec qui que ce soit.
+        L'équipe LeRéseau ne vous demandera <strong>jamais</strong> votre code OTP.
+        Si vous n'avez pas créé de compte, ignorez cet email.
+      </div>
+
+      <p class="text">
+        Ce code est valide pour une utilisation unique.<br />
+        En cas de problème, contactez notre support à
+        <a href="mailto:support@lereseau.com" style="color:#1a56db;">support@lereseau.com</a>.
+      </p>
+    </div>
+
+    <!-- Pied de page -->
+    <div class="footer">
+      <p>© 2026 <span class="brand">LeRéseau</span> — Tous droits réservés</p>
+      <p>Cet email est envoyé automatiquement, merci de ne pas y répondre.</p>
+      <p><a href="#">Politique de confidentialité</a> · <a href="#">Conditions d'utilisation</a></p>
+    </div>
+  </div>
+</body>
+
+</html>
