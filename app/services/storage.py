@@ -1,55 +1,94 @@
 import os
-import boto3
-from botocore.exceptions import NoCredentialsError, ClientError
-from app.core.config import settings
+import asyncio
 import uuid
+import cloudinary
+import cloudinary.uploader
+from app.core.config import settings
 
 class StorageService:
     def __init__(self):
-        self.bucket = getattr(settings, "AWS_S3_BUCKET_NAME", os.getenv("AWS_S3_BUCKET_NAME", "lereseau-premium-docs"))
-        self.region = getattr(settings, "AWS_REGION", os.getenv("AWS_REGION", "eu-west-3"))
+        # We check if Cloudinary is configured via separate settings or a CLOUDINARY_URL string
+        self.is_cloudinary_configured = False
         
-        aws_access_key = getattr(settings, "AWS_ACCESS_KEY_ID", os.getenv("AWS_ACCESS_KEY_ID", "mock_access"))
-        aws_secret_key = getattr(settings, "AWS_SECRET_ACCESS_KEY", os.getenv("AWS_SECRET_ACCESS_KEY", "mock_secret"))
+        # Priority 1: CLOUDINARY_URL connection string
+        cloudinary_url = getattr(settings, "CLOUDINARY_URL", os.getenv("CLOUDINARY_URL"))
+        if cloudinary_url:
+            from urllib.parse import urlparse
+            try:
+                # Strip spaces or quotes if any
+                cloudinary_url = cloudinary_url.strip().strip('"').strip("'")
+                parsed = urlparse(cloudinary_url)
+                cloud_name = parsed.hostname
+                api_key = parsed.username
+                api_secret = parsed.password
+                
+                if cloud_name and api_key and api_secret:
+                    cloudinary.config(
+                        cloud_name=cloud_name,
+                        api_key=api_key,
+                        api_secret=api_secret,
+                        secure=True
+                    )
+                    self.is_cloudinary_configured = True
+                    print("[CLOUDINARY] Configuré avec succès via CLOUDINARY_URL.")
+            except Exception as e:
+                print(f"[CLOUDINARY] Erreur lors de l'initialisation depuis CLOUDINARY_URL: {e}")
         
-        self.is_mocked = (aws_access_key == "mock_access" or not aws_access_key)
-        
-        if not self.is_mocked:
-            self.s3_client = boto3.client(
-                's3',
-                region_name=self.region,
-                aws_access_key_id=aws_access_key,
-                aws_secret_access_key=aws_secret_key
-            )
-        else:
-            self.s3_client = None
+        # Priority 2: Individual configuration parameters (fallback if URL parsing did not configure it)
+        if not self.is_cloudinary_configured:
+            cloud_name = getattr(settings, "CLOUDINARY_CLOUD_NAME", os.getenv("CLOUDINARY_CLOUD_NAME"))
+            api_key = getattr(settings, "CLOUDINARY_API_KEY", os.getenv("CLOUDINARY_API_KEY"))
+            api_secret = getattr(settings, "CLOUDINARY_API_SECRET", os.getenv("CLOUDINARY_API_SECRET"))
+            
+            if cloud_name and api_key and api_secret:
+                # Strip spaces or quotes
+                cloud_name = str(cloud_name).strip().strip('"').strip("'")
+                api_key = str(api_key).strip().strip('"').strip("'")
+                api_secret = str(api_secret).strip().strip('"').strip("'")
+                
+                cloudinary.config(
+                    cloud_name=cloud_name,
+                    api_key=api_key,
+                    api_secret=api_secret,
+                    secure=True
+                )
+                self.is_cloudinary_configured = True
+                print("[CLOUDINARY] Configuré avec succès via les paramètres individuels.")
 
     async def upload_file(self, file_obj, folder: str = "uploads") -> str:
         """
-        Uploads a file to AWS S3 (or generates a Mock URL) and returns the public URL.
+        Uploads a file to Cloudinary (or generates a Mock URL if not configured) and returns the public URL.
+        Supports images, videos, and documents (like PDFs).
         """
+        if not file_obj:
+            return ""
+
         ext = file_obj.filename.split('.')[-1] if (file_obj.filename and '.' in file_obj.filename) else 'bin'
         unique_name = f"{folder}/{uuid.uuid4().hex}.{ext}"
-        
-        if self.is_mocked:
-            print(f"[MOCK S3] Fichier {file_obj.filename} intercepté. (Sauvegarde AWS simulée) -> {unique_name}")
-            return f"https://{self.bucket}.s3.{self.region}.amazonaws.com/{unique_name}"
-        
+
+        if not self.is_cloudinary_configured:
+            print(f"[MOCK CLOUDINARY] Fichier {file_obj.filename} intercepté (Cloudinary non configuré). URL générée -> {unique_name}")
+            return f"https://res.cloudinary.com/mock_cloud/image/upload/{unique_name}"
+
         try:
             content = await file_obj.read()
-            self.s3_client.put_object(
-                Bucket=self.bucket,
-                Key=unique_name,
-                Body=content,
-                ContentType=file_obj.content_type
-            )
+            # Reset cursor position so the file object can be read again elsewhere if needed
             await file_obj.seek(0)
-            return f"https://{self.bucket}.s3.{self.region}.amazonaws.com/{unique_name}"
-        except ClientError as e:
-            print(f"Erreur Amazon S3: {e}")
-            return ""
-        except NoCredentialsError:
-            print("Credentials AWS introuvables.")
+
+            # Upload to Cloudinary using a thread pool to avoid blocking the async event loop
+            upload_result = await asyncio.to_thread(
+                cloudinary.uploader.upload,
+                content,
+                folder=folder,
+                resource_type="auto"
+            )
+            
+            # Retrieve the secure URL
+            url = upload_result.get("secure_url") or upload_result.get("url") or ""
+            print(f"[CLOUDINARY] Fichier {file_obj.filename} téléversé avec succès -> {url}")
+            return url
+        except Exception as e:
+            print(f"Erreur de téléversement Cloudinary: {e}")
             return ""
 
 storage = StorageService()
