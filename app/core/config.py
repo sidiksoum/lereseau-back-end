@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     
     # Database
     DATABASE_URL: str
+    REDIS_URL: Optional[str] = None
     
     # AWS / S3 (For documents)
     AWS_ACCESS_KEY_ID: Optional[str] = None
