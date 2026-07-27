@@ -85,7 +85,15 @@ async def create_comment(post_id: str, comment_in: CommentCreate, db: Session = 
             data={"postId": post.id}
         )
         
-    return comment
+    # Serialize comment with authorDetails
+    d = comment.__dict__.copy()
+    d['authorDetails'] = {
+        "firstName": current_user.firstName,
+        "lastName": current_user.lastName,
+        "avatarUrl": current_user.avatarUrl
+    }
+    d.pop('_sa_instance_state', None)
+    return d
 
 @router.get("/{post_id}/comments")
 def get_comments(post_id: str, db: Session = Depends(get_db)):
@@ -100,14 +108,22 @@ def get_comments(post_id: str, db: Session = Depends(get_db)):
     return res
 
 @router.get("/")
-def get_feed(db: Session = Depends(get_db)):
+def get_feed(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     # Feed simple chronological
     posts = db.query(FeedPost).filter(FeedPost.status == FeedPostStatusEnum.APPROVED).order_by(desc(FeedPost.createdAt)).all()
     
+    # Pre-fetch liked post IDs for current user in one query
+    post_ids = [p.id for p in posts]
+    liked_post_ids = set()
+    if post_ids and current_user:
+        likes = db.query(FeedLike.postId).filter(FeedLike.postId.in_(post_ids), FeedLike.userId == current_user.id).all()
+        liked_post_ids = {l.postId for l in likes}
+        
     res = []
     for p in posts:
         d = p.__dict__.copy()
         d['authorDetails'] = {"firstName": p.author.firstName, "lastName": p.author.lastName, "avatarUrl": p.author.avatarUrl}
+        d['liked'] = p.id in liked_post_ids
         if p.originalPost:
             orig = p.originalPost.__dict__.copy()
             orig['authorDetails'] = {"firstName": p.originalPost.author.firstName, "lastName": p.originalPost.author.lastName, "avatarUrl": p.originalPost.author.avatarUrl}

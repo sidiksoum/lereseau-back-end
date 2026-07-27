@@ -15,7 +15,7 @@ from typing import Optional, List
 
 from app.api.dependencies.auth import get_db, get_current_active_user
 from app.models.user import User, RoleTypeEnum
-from app.models.feed import FeedPost, FeedPostStatusEnum
+from app.models.feed import FeedPost, FeedPostStatusEnum, FeedLike
 from app.models.document import Document
 from app.services.storage import storage
 
@@ -118,7 +118,22 @@ def get_my_feed_posts(
         .order_by(desc(FeedPost.createdAt))
         .all()
     )
-    return posts
+    
+    # Pre-fetch liked post IDs for current user in one query
+    post_ids = [p.id for p in posts]
+    liked_post_ids = set()
+    if post_ids and current_user:
+        likes = db.query(FeedLike.postId).filter(FeedLike.postId.in_(post_ids), FeedLike.userId == current_user.id).all()
+        liked_post_ids = {l.postId for l in likes}
+
+    res = []
+    for p in posts:
+        d = p.__dict__.copy()
+        d['liked'] = p.id in liked_post_ids
+        d.pop('_sa_instance_state', None)
+        res.append(d)
+        
+    return res
 
 
 @router.delete("/feed/{post_id}")
