@@ -8,7 +8,7 @@ from app.models.user import User
 from app.models.document import Document
 from app.services.storage import storage
 from app.services.recommendations import score_document_match
-from app.services.cache import cache
+from app.services.cache import cache, make_jsonable
 from app.services.metrics import metrics
 from app.services.logging import logger
 from typing import Optional
@@ -68,7 +68,7 @@ async def publish_document(
     db.add(doc)
     db.commit()
     db.refresh(doc)
-    return doc
+    return make_jsonable(doc)
 
 
 @router.get("/")
@@ -86,7 +86,7 @@ def list_documents(
     cached = cache.get(cache_key)
     if cached is not None:
         metrics.increment("documents_cache_hits")
-        return cached
+        return make_jsonable(cached)
 
     query = db.query(Document).filter(Document.status == "APPROVED")
     if q:
@@ -109,7 +109,7 @@ def list_documents(
     for doc in items:
         scored.append((score_document_match(current_user, doc), doc))
     scored.sort(key=lambda item: item[0], reverse=True)
-    result = [doc for _, doc in scored]
+    result = make_jsonable([doc for _, doc in scored])
     cache.set(cache_key, result, ttl=120)
     metrics.increment("documents_cache_misses")
     metrics.observe("documents_latency_ms", (perf_counter() - started) * 1000)
@@ -137,4 +137,4 @@ def get_document(id: str, db: Session = Depends(get_db)):
         } if author else None,
     }
     doc_dict.pop("_sa_instance_state", None)
-    return doc_dict
+    return make_jsonable(doc_dict)

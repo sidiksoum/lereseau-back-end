@@ -9,7 +9,7 @@ from app.models.opportunity import Opportunity
 from app.models.user import User
 from app.schemas.opportunity import OpportunityCreate, OpportunityResponse
 from app.services.recommendations import score_opportunity_match
-from app.services.cache import cache
+from app.services.cache import cache, make_jsonable
 from app.services.metrics import metrics
 from app.services.logging import logger
 
@@ -30,7 +30,7 @@ def list_opportunities(
     cached = cache.get(cache_key)
     if cached is not None:
         metrics.increment("opportunities_cache_hits")
-        return cached
+        return make_jsonable(cached)
 
     query = db.query(Opportunity).filter(Opportunity.isActive == True)
     if q:
@@ -49,7 +49,7 @@ def list_opportunities(
     items = opportunities[:limit]
     scored = [(score_opportunity_match(current_user, opp), opp) for opp in items]
     scored.sort(key=lambda item: item[0], reverse=True)
-    result = [opp for _, opp in scored]
+    result = make_jsonable([opp for _, opp in scored])
     cache.set(cache_key, result, ttl=120)
     metrics.increment("opportunities_cache_misses")
     metrics.observe("opportunities_latency_ms", (perf_counter() - started) * 1000)
@@ -74,7 +74,7 @@ def publish_opportunity(
     db.add(new_op)
     db.commit()
     db.refresh(new_op)
-    return new_op
+    return make_jsonable(new_op)
 
 
 @router.get("/{id}", response_model=OpportunityResponse)
@@ -82,4 +82,4 @@ def get_opportunity(id: str, db: Session = Depends(get_db)):
     op = db.query(Opportunity).filter(Opportunity.id == id).first()
     if not op:
         raise HTTPException(status_code=404, detail="Opportunity not found")
-    return op
+    return make_jsonable(op)

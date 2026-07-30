@@ -9,7 +9,7 @@ from app.models.user import User
 from app.models.notification import NotificationTypeEnum
 from app.services.notifications import NotificationService
 from app.services.recommendations import score_feed_post_match
-from app.services.cache import cache
+from app.services.cache import cache, make_jsonable
 from app.services.metrics import metrics
 from app.services.logging import logger
 from pydantic import BaseModel
@@ -35,7 +35,7 @@ async def toggle_like_post(post_id: str, db: Session = Depends(get_db), current_
         db.delete(existing_like)
         post.likesCount -= 1
         db.commit()
-        return {"liked": False, "likesCount": post.likesCount}
+        return make_jsonable({"liked": False, "likesCount": post.likesCount})
 
     new_like = FeedLike(postId=post_id, userId=current_user.id)
     db.add(new_like)
@@ -51,7 +51,7 @@ async def toggle_like_post(post_id: str, db: Session = Depends(get_db), current_
             data={"postId": post.id},
         )
 
-    return {"liked": True, "likesCount": post.likesCount}
+    return make_jsonable({"liked": True, "likesCount": post.likesCount})
 
 
 @router.post("/{post_id}/repost")
@@ -63,7 +63,7 @@ async def repost_feed(post_id: str, db: Session = Depends(get_db), current_user:
     repost = FeedPost(authorId=current_user.id, originalPostId=original_post.id, status=FeedPostStatusEnum.APPROVED)
     db.add(repost)
     db.commit()
-    return repost
+    return make_jsonable(repost)
 
 
 @router.post("/{post_id}/comments")
@@ -99,7 +99,7 @@ async def create_comment(post_id: str, comment_in: CommentCreate, db: Session = 
         "avatarUrl": current_user.avatarUrl,
     }
     d.pop("_sa_instance_state", None)
-    return d
+    return make_jsonable(d)
 
 
 @router.get("/{post_id}/comments")
@@ -111,7 +111,7 @@ def get_comments(post_id: str, db: Session = Depends(get_db)):
         d["authorDetails"] = {"firstName": c.author.firstName, "lastName": c.author.lastName, "avatarUrl": c.author.avatarUrl}
         d.pop("_sa_instance_state", None)
         res.append(d)
-    return res
+    return make_jsonable(res)
 
 
 @router.get("/")
@@ -128,7 +128,7 @@ def get_feed(
     cached = cache.get(cache_key)
     if cached is not None:
         metrics.increment("feed_cache_hits")
-        return cached
+        return make_jsonable(cached)
 
     query = db.query(FeedPost).filter(FeedPost.status == FeedPostStatusEnum.APPROVED)
 
@@ -169,6 +169,7 @@ def get_feed(
         serialized.append(d)
 
     serialized.sort(key=lambda item: item.get("recommendationScore", 0), reverse=True)
+    serialized = make_jsonable(serialized)
     cache.set(cache_key, serialized, ttl=60)
     metrics.increment("feed_cache_misses")
     metrics.observe("feed_latency_ms", (perf_counter() - started) * 1000)

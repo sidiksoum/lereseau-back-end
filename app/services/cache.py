@@ -1,7 +1,32 @@
 import json
 import os
 import time
+from datetime import date, datetime, time as dt_time
+from enum import Enum
 from typing import Any, Optional
+
+
+def make_jsonable(value: Any) -> Any:
+    if value is None or isinstance(value, (str, int, float, bool)):
+        return value
+    if isinstance(value, (datetime, date, dt_time)):
+        return value.isoformat()
+    if isinstance(value, Enum):
+        return value.value
+    if isinstance(value, dict):
+        return {str(key): make_jsonable(item) for key, item in value.items()}
+    if isinstance(value, (list, tuple, set)):
+        return [make_jsonable(item) for item in value]
+    if hasattr(value, "model_dump") and callable(value.model_dump):
+        return make_jsonable(value.model_dump())
+    if hasattr(value, "__dict__"):
+        data = {}
+        for key, item in vars(value).items():
+            if key.startswith("_"):
+                continue
+            data[key] = make_jsonable(item)
+        return data
+    return str(value)
 
 
 class CacheService:
@@ -40,7 +65,7 @@ class CacheService:
         return value
 
     def set(self, key: str, value: Any, ttl: int = 300) -> None:
-        payload = json.dumps(value)
+        payload = json.dumps(make_jsonable(value))
         if self._redis_client:
             try:
                 self._redis_client.setex(key, ttl, payload)
