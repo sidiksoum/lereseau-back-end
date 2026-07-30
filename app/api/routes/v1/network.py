@@ -115,12 +115,22 @@ def follow_institution(institution_id: str, db: Session = Depends(get_db), curre
     existing = db.query(Connection).filter(
         Connection.requesterId == current_user.id,
         Connection.addresseeId == institution_id,
-        Connection.type == ConnectionTypeEnum.FOLLOWING,
+        Connection.type.in_([ConnectionTypeEnum.FOLLOWER, ConnectionTypeEnum.FOLLOWING]),
     ).first()
     if existing:
+        if existing.type != ConnectionTypeEnum.FOLLOWER:
+            existing.type = ConnectionTypeEnum.FOLLOWER
+            existing.status = ConnectionStatusEnum.ACCEPTED
+            db.commit()
+            db.refresh(existing)
         return existing
 
-    conn = Connection(requesterId=current_user.id, addresseeId=institution_id, type=ConnectionTypeEnum.FOLLOWING, status=ConnectionStatusEnum.ACCEPTED)
+    conn = Connection(
+        requesterId=current_user.id,
+        addresseeId=institution_id,
+        type=ConnectionTypeEnum.FOLLOWER,
+        status=ConnectionStatusEnum.ACCEPTED,
+    )
     db.add(conn)
     db.commit()
     db.refresh(conn)
@@ -204,7 +214,11 @@ def get_incoming_requests(db: Session = Depends(get_db), current_user: User = De
 
 @router.get("/accepted")
 def get_accepted_connections(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    conns = db.query(Connection).filter((Connection.requesterId == current_user.id) | (Connection.addresseeId == current_user.id), Connection.status == ConnectionStatusEnum.ACCEPTED).all()
+    conns = db.query(Connection).filter(
+        ((Connection.requesterId == current_user.id) | (Connection.addresseeId == current_user.id)),
+        Connection.status == ConnectionStatusEnum.ACCEPTED,
+        Connection.type.notin_([ConnectionTypeEnum.FOLLOWER, ConnectionTypeEnum.FOLLOWING]),
+    ).all()
 
     res = []
     for c in conns:
@@ -220,7 +234,11 @@ def get_accepted_connections(db: Session = Depends(get_db), current_user: User =
 
 @router.get("/accepted/professionals")
 def get_accepted_professionals(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    conns = db.query(Connection).filter((Connection.requesterId == current_user.id) | (Connection.addresseeId == current_user.id), Connection.status == ConnectionStatusEnum.ACCEPTED).all()
+    conns = db.query(Connection).filter(
+        ((Connection.requesterId == current_user.id) | (Connection.addresseeId == current_user.id)),
+        Connection.status == ConnectionStatusEnum.ACCEPTED,
+        Connection.type.notin_([ConnectionTypeEnum.FOLLOWER, ConnectionTypeEnum.FOLLOWING]),
+    ).all()
 
     res = []
     for c in conns:
@@ -236,7 +254,11 @@ def get_accepted_professionals(db: Session = Depends(get_db), current_user: User
 
 @router.get("/accepted/mentors")
 def get_accepted_mentors(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
-    conns = db.query(Connection).filter((Connection.requesterId == current_user.id) | (Connection.addresseeId == current_user.id), Connection.status == ConnectionStatusEnum.ACCEPTED, Connection.type == ConnectionTypeEnum.MENTORSHIP).all()
+    conns = db.query(Connection).filter(
+        ((Connection.requesterId == current_user.id) | (Connection.addresseeId == current_user.id)),
+        Connection.status == ConnectionStatusEnum.ACCEPTED,
+        Connection.type == ConnectionTypeEnum.MENTORSHIP,
+    ).all()
 
     res = []
     for c in conns:

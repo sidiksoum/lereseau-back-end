@@ -129,6 +129,10 @@ class UserInDBBase(UserBase):
 class UserResponse(UserInDBBase):
     experiences: List[ExperienceResource] = []
     educations: List[EducationResource] = []
+    isFollowing: bool = False
+    isFollowed: bool = False
+    followedByMe: bool = False
+    iFollow: bool = False
 
 class Token(BaseModel):
     access_token: str

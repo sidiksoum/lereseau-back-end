@@ -15,6 +15,7 @@ class ConnectionTypeEnum(str, enum.Enum):
     FRIEND = "FRIEND"
     MENTORSHIP = "MENTORSHIP"
     FOLLOWING = "FOLLOWING"
+    FOLLOWER = "FOLLOWER"
 
 def generate_uuid():
     return str(uuid.uuid4())

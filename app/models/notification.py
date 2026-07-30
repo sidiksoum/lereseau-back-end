@@ -14,6 +14,7 @@ class NotificationTypeEnum(str, enum.Enum):
     FEED_COMMENT = "FEED_COMMENT"
     MENTION = "MENTION"
     SYSTEM = "SYSTEM"
+    FOLLOWER_POST = "FOLLOWER_POST"
 
 def generate_uuid():
     return str(uuid.uuid4())

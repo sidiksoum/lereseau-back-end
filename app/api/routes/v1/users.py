@@ -5,12 +5,51 @@ from typing import Any, Optional
 import json
 from app.api.dependencies.auth import get_db, get_current_user, get_current_active_user
 from app.models.user import User, Experience, Education, StatusEnum
-from app.models.network import Connection, ConnectionStatusEnum
+from app.models.network import Connection, ConnectionStatusEnum, ConnectionTypeEnum
 from app.schemas.user import UserResponse, ExperienceCreate, ExperienceUpdate, ExperienceResource, EducationCreate, EducationUpdate, EducationResource
 from app.services.storage import storage
 from app.services.recommendations import score_profile_match
 
 router = APIRouter()
+
+
+def _serialize_user_for_response(db: Session, current_user: User, user: User) -> UserResponse:
+    payload = UserResponse.model_validate(user).model_dump()
+
+    try:
+        follow_relation = (
+            db.query(Connection)
+            .filter(
+                Connection.requesterId == current_user.id,
+                Connection.addresseeId == user.id,
+                Connection.status == ConnectionStatusEnum.ACCEPTED,
+                Connection.type.in_([ConnectionTypeEnum.FOLLOWER, ConnectionTypeEnum.FOLLOWING]),
+            )
+            .first()
+        )
+        reverse_relation = (
+            db.query(Connection)
+            .filter(
+                Connection.requesterId == user.id,
+                Connection.addresseeId == current_user.id,
+                Connection.status == ConnectionStatusEnum.ACCEPTED,
+                Connection.type.in_([ConnectionTypeEnum.FOLLOWER, ConnectionTypeEnum.FOLLOWING]),
+            )
+            .first()
+        )
+    except Exception:
+        follow_relation = None
+        reverse_relation = None
+
+    payload.update(
+        {
+            "isFollowing": follow_relation is not None,
+            "isFollowed": reverse_relation is not None,
+            "followedByMe": follow_relation is not None,
+            "iFollow": follow_relation is not None,
+        }
+    )
+    return UserResponse(**payload)
 
 
 @router.get("/", response_model=list[UserResponse])
@@ -38,27 +77,43 @@ def list_users(
     for candidate in candidates:
         scored.append((score_profile_match(current_user, candidate), candidate))
     scored.sort(key=lambda item: item[0], reverse=True)
-    return [candidate for _, candidate in scored[:limit]]
+    return [_serialize_user_for_response(db, current_user, candidate) for _, candidate in scored[:limit]]
 
 
 @router.get("/students", response_model=list[UserResponse])
-def get_students(db: Session = Depends(get_db)):
-    return db.query(User).filter(User.roleType == "student").all()
+def get_students(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    users = db.query(User).filter(User.roleType == "student").all()
+    return [_serialize_user_for_response(db, current_user, user) for user in users]
 
 
 @router.get("/professionals", response_model=list[UserResponse])
-def get_professionals(db: Session = Depends(get_db)):
-    return db.query(User).filter(User.roleType == "professional").all()
+def get_professionals(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    users = db.query(User).filter(User.roleType == "professional").all()
+    return [_serialize_user_for_response(db, current_user, user) for user in users]
 
 
 @router.get("/institutions", response_model=list[UserResponse])
-def get_institutions(db: Session = Depends(get_db)):
-    return db.query(User).filter(User.roleType == "institution").all()
+def get_institutions(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    users = db.query(User).filter(User.roleType == "institution").all()
+    return [_serialize_user_for_response(db, current_user, user) for user in users]
 
 
 @router.get("/mentors", response_model=list[UserResponse])
-def get_mentors(db: Session = Depends(get_db)):
-    return db.query(User).filter(User.roleType == "professional").all()
+def get_mentors(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    users = db.query(User).filter(User.roleType == "professional").all()
+    return [_serialize_user_for_response(db, current_user, user) for user in users]
 
 
 @router.get("/premium-mentors", response_model=list[UserResponse])
@@ -69,12 +124,16 @@ def get_premium_certified_mentors(
     if not current_user.isPremium and current_user.role.value != "ADMIN":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="L'accès à cette liste est strictement réservé aux membres Premium.")
 
-    return db.query(User).filter(User.roleType == "professional", User.nineaUploaded == True, User.isPremium == True).all()
+    users = db.query(User).filter(User.roleType == "professional", User.nineaUploaded == True, User.isPremium == True).all()
+    return [_serialize_user_for_response(db, current_user, user) for user in users]
 
 
 @router.get("/me", response_model=UserResponse)
-def read_current_user(current_user: User = Depends(get_current_active_user)):
-    return current_user
+def read_current_user(
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user),
+):
+    return _serialize_user_for_response(db, current_user, current_user)
 
 
 @router.patch("/me", response_model=UserResponse)
@@ -225,7 +284,7 @@ def read_user_by_id(id: str, db: Session = Depends(get_db), current_user: User =
     user = db.query(User).filter(User.id == id).first()
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
-    return user
+    return _serialize_user_for_response(db, current_user, user)
 
 
 @router.post("/me/certification-request")

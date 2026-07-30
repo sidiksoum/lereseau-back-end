@@ -17,7 +17,10 @@ from app.api.dependencies.auth import get_db, get_current_active_user
 from app.models.user import User, RoleTypeEnum
 from app.models.feed import FeedPost, FeedPostStatusEnum, FeedLike
 from app.models.document import Document
+from app.models.network import Connection, ConnectionStatusEnum, ConnectionTypeEnum
+from app.models.notification import NotificationTypeEnum
 from app.services.storage import storage
+from app.services.notifications import NotificationService
 
 router = APIRouter()
 
@@ -102,6 +105,26 @@ async def publish_feed_as_user(
     db.add(post)
     db.commit()
     db.refresh(post)
+
+    if current_user.roleType == RoleTypeEnum.institution:
+        followers = (
+            db.query(Connection)
+            .filter(
+                Connection.addresseeId == current_user.id,
+                Connection.type == ConnectionTypeEnum.FOLLOWER,
+                Connection.status == ConnectionStatusEnum.ACCEPTED,
+            )
+            .all()
+        )
+        for follower_connection in followers:
+            await NotificationService.push_notification(
+                db=db,
+                user_id=follower_connection.requesterId,
+                type=NotificationTypeEnum.FOLLOWER_POST,
+                message=f"{current_user.firstName or 'L’institution'} a publié une nouvelle annonce.",
+                data={"postId": post.id, "authorId": current_user.id},
+            )
+
     return post
 
 
