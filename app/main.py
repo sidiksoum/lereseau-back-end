@@ -4,6 +4,10 @@ import socketio
 
 from app.core.config import settings
 from app.api.routes import auth
+from app.services.background_jobs import background_jobs
+from app.services.cache import cache
+from app.services.logging import logger
+from app.services.metrics import metrics
 from app.api.routes.v1 import users, opportunities, checkout, network, documents, forum, feed, chat, notifications, chatbot, publishing as user_publishing
 from app.api.routes.admin import users as admin_users, forum as admin_forum, publishing as admin_publishing, certifications as admin_certifications, dashboard as admin_dashboard
 from app.sockets.handlers import register_socket_events
@@ -17,7 +21,11 @@ async def lifespan(app: FastAPI):
     db = SessionLocal()
     init_super_admin(db)
     db.close()
+    await background_jobs.start()
+    logger.info("application_started", extra={"request_id": "startup"})
     yield
+    await background_jobs.stop()
+    logger.info("application_stopped", extra={"request_id": "shutdown"})
 
 app = FastAPI(
     title=settings.PROJECT_NAME,
@@ -45,6 +53,16 @@ sio_app = socketio.ASGIApp(sio, other_asgi_app=app)
 @app.get("/")
 def root():
     return {"message": "Welcome to LeRéseau API"}
+
+
+@app.get("/health")
+def health():
+    return {"status": "ok", "cache": "memory" if not cache._redis_client else "redis"}
+
+
+@app.get("/metrics")
+def metrics_endpoint():
+    return metrics.snapshot()
 
 app.include_router(auth.router, prefix="/api/auth", tags=["auth"])
 app.include_router(users.router, prefix="/api/users", tags=["users"])
