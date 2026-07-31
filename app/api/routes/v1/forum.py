@@ -119,7 +119,7 @@ async def create_reply(topic_id: str, reply_in: ReplyCreate, db: Session = Depen
             user_id=topic.authorId,
             type=NotificationTypeEnum.FORUM_REPLY,
             message=f"{current_user.firstName} a répondu à votre sujet '{topic.title}'.",
-            data={"topicId": topic.id}
+            data={"topicId": topic.id, "fromUserId": current_user.id}
         )
         
     return reply

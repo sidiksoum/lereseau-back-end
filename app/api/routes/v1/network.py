@@ -69,7 +69,7 @@ async def send_connection_request(
         user_id=to_user_id,
         type=NotificationTypeEnum.FRIEND_REQUEST,
         message=f"{current_user.firstName} vous a envoyé une demande de connexion.",
-        data={"connectionId": conn.id},
+        data={"connectionId": conn.id, "fromUserId": current_user.id},
     )
 
     return conn

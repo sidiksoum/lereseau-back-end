@@ -25,8 +25,29 @@ class NotificationService:
         db.commit()
         db.refresh(notif)
         
+        # Get sender details if fromUserId or authorId is in data
+        sender_details = None
+        if data:
+            sender_id = data.get("fromUserId") or data.get("authorId")
+            if sender_id:
+                from app.models.user import User
+                sender = db.query(User).filter(User.id == sender_id).first()
+                if sender:
+                    sender_details = {
+                        "id": sender.id,
+                        "firstName": sender.firstName,
+                        "lastName": sender.lastName,
+                        "avatarUrl": sender.avatarUrl
+                    }
+
         # 2. Push temps réel
         # Émet l'événement sur la room "user_{user_id}"
-        await sio.emit("new_notification", {"id": notif.id, "type": notif.type.value, "message": notif.message, "data": notif.data}, room=f"user_{user_id}")
+        await sio.emit("new_notification", {
+            "id": notif.id,
+            "type": notif.type.value,
+            "message": notif.message,
+            "data": notif.data,
+            "senderDetails": sender_details
+        }, room=f"user_{user_id}")
         
         return notif

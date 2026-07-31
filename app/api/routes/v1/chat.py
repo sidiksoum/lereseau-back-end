@@ -162,7 +162,7 @@ async def send_message(msg_in: MessageCreate, db: Session = Depends(get_db), cur
         user_id=msg_in.recipientId,
         type=NotificationTypeEnum.CHAT_MESSAGE,
         message=f"Nouveau message de {current_user.firstName}",
-        data={"conversationId": convo.id}
+        data={"conversationId": convo.id, "fromUserId": current_user.id}
     )
     
     d_convo = convo.__dict__.copy()

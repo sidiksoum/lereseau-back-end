@@ -48,7 +48,7 @@ async def toggle_like_post(post_id: str, db: Session = Depends(get_db), current_
             user_id=post.authorId,
             type=NotificationTypeEnum.FEED_LIKE,
             message=f"{current_user.firstName} a aimé votre publication.",
-            data={"postId": post.id},
+            data={"postId": post.id, "fromUserId": current_user.id},
         )
 
     return make_jsonable({"liked": True, "likesCount": post.likesCount})
@@ -89,7 +89,7 @@ async def create_comment(post_id: str, comment_in: CommentCreate, db: Session = 
             user_id=post.authorId,
             type=NotificationTypeEnum.FEED_COMMENT,
             message=f"{current_user.firstName} a commenté votre publication.",
-            data={"postId": post.id},
+            data={"postId": post.id, "fromUserId": current_user.id},
         )
 
     d = comment.__dict__.copy()
