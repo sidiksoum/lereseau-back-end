@@ -98,6 +98,30 @@ def test_follow_endpoint_creates_follower_relation_and_not_accepted_connection(c
     )
 
 
+def test_suggestions_exclude_admin_accounts(client_and_db):
+    client, db = client_and_db
+
+    current_user = _create_user(db, email="current@example.com", role_type=RoleTypeEnum.student)
+    admin_user = _create_user(
+        db,
+        email="admin@example.com",
+        role_type=RoleTypeEnum.professional,
+    )
+    admin_user.role = RoleEnum.ADMIN
+    db.commit()
+
+    def override_current_user():
+        return current_user
+
+    client.app.dependency_overrides[get_current_active_user] = override_current_user
+
+    response = client.get("/api/network/suggestions")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert all(item["id"] != admin_user.id for item in payload)
+
+
 def test_publishing_feed_notifies_followers(client_and_db):
     client, db = client_and_db
 

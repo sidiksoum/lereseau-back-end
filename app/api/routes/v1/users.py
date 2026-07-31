@@ -4,7 +4,7 @@ from sqlalchemy import or_
 from typing import Any, Optional
 import json
 from app.api.dependencies.auth import get_db, get_current_user, get_current_active_user
-from app.models.user import User, Experience, Education, StatusEnum
+from app.models.user import User, Experience, Education, StatusEnum, RoleEnum
 from app.models.network import Connection, ConnectionStatusEnum, ConnectionTypeEnum
 from app.schemas.user import UserResponse, ExperienceCreate, ExperienceUpdate, ExperienceResource, EducationCreate, EducationUpdate, EducationResource
 from app.services.storage import storage
@@ -23,9 +23,8 @@ def _serialize_user_for_response(db: Session, current_user: User, user: User) ->
                 Connection.requesterId == current_user.id,
                 Connection.addresseeId == user.id,
                 Connection.status == ConnectionStatusEnum.ACCEPTED,
-                Connection.type.in_([ConnectionTypeEnum.FOLLOWER, ConnectionTypeEnum.FOLLOWING]),
             )
-            .first()
+            .all()
         )
         reverse_relation = (
             db.query(Connection)
@@ -33,10 +32,11 @@ def _serialize_user_for_response(db: Session, current_user: User, user: User) ->
                 Connection.requesterId == user.id,
                 Connection.addresseeId == current_user.id,
                 Connection.status == ConnectionStatusEnum.ACCEPTED,
-                Connection.type.in_([ConnectionTypeEnum.FOLLOWER, ConnectionTypeEnum.FOLLOWING]),
             )
-            .first()
+            .all()
         )
+        follow_relation = next((item for item in follow_relation if getattr(item, "type", None) in {ConnectionTypeEnum.FOLLOWER, ConnectionTypeEnum.FOLLOWING}), None)
+        reverse_relation = next((item for item in reverse_relation if getattr(item, "type", None) in {ConnectionTypeEnum.FOLLOWER, ConnectionTypeEnum.FOLLOWING}), None)
     except Exception:
         follow_relation = None
         reverse_relation = None
@@ -67,7 +67,16 @@ def list_users(
         else:
             blocked_ids.add(conn.requesterId)
 
-    query = db.query(User).filter(User.id != current_user.id, User.status != StatusEnum.BANNED).filter(~User.id.in_(list(blocked_ids)))
+    query = (
+        db.query(User)
+        .filter(
+            User.id != current_user.id,
+            User.status != StatusEnum.BANNED,
+            User.role != RoleEnum.ADMIN,
+            User.role != RoleEnum.SUPER_ADMIN,
+        )
+        .filter(~User.id.in_(list(blocked_ids)))
+    )
     if q:
         like_q = f"%{q}%"
         query = query.filter(or_(User.firstName.ilike(like_q), User.lastName.ilike(like_q), User.jobTitle.ilike(like_q), User.studyDomain.ilike(like_q)))
@@ -85,7 +94,11 @@ def get_students(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    users = db.query(User).filter(User.roleType == "student").all()
+    users = (
+        db.query(User)
+        .filter(User.roleType == "student", User.role != RoleEnum.ADMIN, User.role != RoleEnum.SUPER_ADMIN)
+        .all()
+    )
     return [_serialize_user_for_response(db, current_user, user) for user in users]
 
 
@@ -103,7 +116,11 @@ def get_institutions(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    users = db.query(User).filter(User.roleType == "institution").all()
+    users = (
+        db.query(User)
+        .filter(User.roleType == "institution", User.role != RoleEnum.ADMIN, User.role != RoleEnum.SUPER_ADMIN)
+        .all()
+    )
     return [_serialize_user_for_response(db, current_user, user) for user in users]
 
 
@@ -112,7 +129,11 @@ def get_mentors(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    users = db.query(User).filter(User.roleType == "professional").all()
+    users = (
+        db.query(User)
+        .filter(User.roleType == "professional", User.role != RoleEnum.ADMIN, User.role != RoleEnum.SUPER_ADMIN)
+        .all()
+    )
     return [_serialize_user_for_response(db, current_user, user) for user in users]
 
 
@@ -124,7 +145,17 @@ def get_premium_certified_mentors(
     if not current_user.isPremium and current_user.role.value != "ADMIN":
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="L'accès à cette liste est strictement réservé aux membres Premium.")
 
-    users = db.query(User).filter(User.roleType == "professional", User.nineaUploaded == True, User.isPremium == True).all()
+    users = (
+        db.query(User)
+        .filter(
+            User.roleType == "professional",
+            User.nineaUploaded == True,
+            User.isPremium == True,
+            User.role != RoleEnum.ADMIN,
+            User.role != RoleEnum.SUPER_ADMIN,
+        )
+        .all()
+    )
     return [_serialize_user_for_response(db, current_user, user) for user in users]
 
 

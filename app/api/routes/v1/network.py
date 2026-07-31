@@ -3,7 +3,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from app.api.dependencies.auth import get_db, get_current_active_user
-from app.models.user import User, StatusEnum
+from app.models.user import User, StatusEnum, RoleEnum
 from app.models.network import Connection, ConnectionTypeEnum, ConnectionStatusEnum
 from app.services.recommendations import score_profile_match
 from app.services.cache import cache
@@ -112,18 +112,22 @@ def follow_institution(institution_id: str, db: Session = Depends(get_db), curre
     if not target:
         raise HTTPException(404, "Institution introuvable.")
 
-    existing = db.query(Connection).filter(
-        Connection.requesterId == current_user.id,
-        Connection.addresseeId == institution_id,
-        Connection.type.in_([ConnectionTypeEnum.FOLLOWER, ConnectionTypeEnum.FOLLOWING]),
-    ).first()
-    if existing:
-        if existing.type != ConnectionTypeEnum.FOLLOWER:
-            existing.type = ConnectionTypeEnum.FOLLOWER
-            existing.status = ConnectionStatusEnum.ACCEPTED
+    existing = (
+        db.query(Connection)
+        .filter(
+            Connection.requesterId == current_user.id,
+            Connection.addresseeId == institution_id,
+        )
+        .all()
+    )
+    follow_relation = next((item for item in existing if getattr(item, "type", None) in {ConnectionTypeEnum.FOLLOWER, ConnectionTypeEnum.FOLLOWING}), None)
+    if follow_relation:
+        if getattr(follow_relation, "type", None) != ConnectionTypeEnum.FOLLOWER:
+            follow_relation.type = ConnectionTypeEnum.FOLLOWER
+            follow_relation.status = ConnectionStatusEnum.ACCEPTED
             db.commit()
-            db.refresh(existing)
-        return existing
+            db.refresh(follow_relation)
+        return follow_relation
 
     conn = Connection(
         requesterId=current_user.id,
@@ -150,8 +154,19 @@ def get_smart_suggestions(
         metrics.increment("network_cache_hits")
         return cached
 
+    cache.delete(cache_key)
+
     blocked_ids = _connected_user_ids(db, current_user)
-    users = db.query(User).filter(User.id != current_user.id, User.status != StatusEnum.BANNED).all()
+    users = (
+        db.query(User)
+        .filter(
+            User.id != current_user.id,
+            User.status != StatusEnum.BANNED,
+            User.role != RoleEnum.ADMIN,
+            User.role != RoleEnum.SUPER_ADMIN,
+        )
+        .all()
+    )
     scored = []
     for candidate in users:
         if candidate.id in blocked_ids:
