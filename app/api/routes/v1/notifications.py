@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 from app.api.dependencies.auth import get_db, get_current_active_user
-from app.models.notification import Notification
+from app.models.notification import Notification, PushSubscription
 from app.models.user import User
 
 router = APIRouter()
@@ -90,4 +90,55 @@ def mark_as_read(id: str, db: Session = Depends(get_db), current_user: User = De
 def mark_all_as_read(db: Session = Depends(get_db), current_user: User = Depends(get_current_active_user)):
     db.query(Notification).filter(Notification.userId == current_user.id, Notification.isRead == False).update({"isRead": True})
     db.commit()
+    return {"ok": True}
+
+
+from pydantic import BaseModel
+from typing import Dict
+
+class PushKeysSchema(BaseModel):
+    p256dh: str
+    auth: str
+
+class PushSubscriptionSchema(BaseModel):
+    endpoint: str
+    keys: PushKeysSchema
+
+@router.post("/subscribe")
+def subscribe_push(
+    subscription: PushSubscriptionSchema,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    existing = db.query(PushSubscription).filter(PushSubscription.endpoint == subscription.endpoint).first()
+    if existing:
+        existing.userId = current_user.id
+        existing.p256dh = subscription.keys.p256dh
+        existing.auth = subscription.keys.auth
+        db.commit()
+        return {"ok": True}
+        
+    new_sub = PushSubscription(
+        userId=current_user.id,
+        endpoint=subscription.endpoint,
+        p256dh=subscription.keys.p256dh,
+        auth=subscription.keys.auth
+    )
+    db.add(new_sub)
+    db.commit()
+    return {"ok": True}
+
+@router.post("/unsubscribe")
+def unsubscribe_push(
+    endpoint: str,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_active_user)
+):
+    sub = db.query(PushSubscription).filter(
+        PushSubscription.endpoint == endpoint,
+        PushSubscription.userId == current_user.id
+    ).first()
+    if sub:
+        db.delete(sub)
+        db.commit()
     return {"ok": True}

@@ -66,6 +66,10 @@ class Settings(BaseSettings):
     # MailerSend (Production Email Service via API)
     MAILERSEND_API_KEY: Optional[str] = None
 
+    # VAPID Keys for Web Push
+    VAPID_PUBLIC_KEY: str = "BCqd9LIoVZbHi6yh5GAa4h24u59NUsD5sK2As6Bp-Hui78psNRDqcSCon12QJ6qruP1GJ-ck92SVXYJY6STB23k"
+    VAPID_PRIVATE_KEY: str = "-----BEGIN PRIVATE KEY-----\nMIGHAgEAMBMGByqGSM49AgEGCCqGSM49AwEHBG0wawIBAQQgLvkwegAkIpESSY3E\nYBi8O4ycX7hIlqIHP+eT6KM3s/ahRANCAAQqnfSyKFWWx4usoeRgGuIduLufTVLA\n+bCtgLOgafh7ou/KbDUQ6nEgqJ9dkCeqq7j9RifnJPdklV2CWOkkwdt5\n-----END PRIVATE KEY-----"
+
     model_config = SettingsConfigDict(env_file=".env", case_sensitive=True, extra="ignore")
 
 settings = Settings()

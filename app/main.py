@@ -18,6 +18,14 @@ from app.db.init_db import init_super_admin
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    from app.db.base import Base
+    from app.db.session import engine
+    try:
+        Base.metadata.create_all(bind=engine)
+        print("[DATABASE] Tables synchronisées avec succès.")
+    except Exception as e:
+        print(f"[DATABASE] Erreur de synchronisation des tables: {e}")
+        
     db = SessionLocal()
     init_super_admin(db)
     db.close()

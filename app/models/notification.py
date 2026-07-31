@@ -35,3 +35,18 @@ class Notification(Base):
     createdAt = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), index=True)
 
     user = relationship("User")
+
+
+class PushSubscription(Base):
+    __tablename__ = "push_subscriptions"
+
+    id = Column(String, primary_key=True, default=generate_uuid, index=True)
+    userId = Column(String, ForeignKey("users.id"), nullable=False, index=True)
+    endpoint = Column(String, nullable=False, unique=True, index=True)
+    
+    p256dh = Column(String, nullable=False)
+    auth = Column(String, nullable=False)
+    
+    createdAt = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    user = relationship("User")
