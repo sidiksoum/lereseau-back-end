@@ -1,5 +1,6 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.attributes import flag_modified
 from sqlalchemy import or_, and_, desc
 from app.api.dependencies.auth import get_db, get_current_active_user
 from app.models.chat import Conversation, Message, MessageTypeEnum
@@ -58,7 +59,8 @@ def get_messages(conversation_id: str, db: Session = Depends(get_db), current_us
     
     # Mark messages as read
     if convo.unreadCount and current_user.id in convo.unreadCount:
-        convo.unreadCount[current_user.id] = 0
+        convo.unreadCount = {**convo.unreadCount, current_user.id: 0}
+        flag_modified(convo, 'unreadCount')
         db.commit()
     
     # Serialization de la conversation avec otherParticipants
