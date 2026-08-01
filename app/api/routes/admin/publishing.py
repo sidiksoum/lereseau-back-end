@@ -58,6 +58,7 @@ async def publish_document(
     title: str = Form(...),
     domain: Optional[str] = Form(None),
     category: Optional[str] = Form(None),
+    accessType: Optional[str] = Form('FREE'),
     price: Optional[float] = Form(None),
     description: Optional[str] = Form(None),
     pagesCount: Optional[int] = Form(None),
@@ -77,24 +78,26 @@ async def publish_document(
     db: Session = Depends(get_db),
     current_admin: User = Depends(require_role("ADMIN"))
 ):
-    # Priorité : fichier uploadé > documentUrlString > fileUrl > imageUrl/previewUrl
-    resolved_url = documentUrlString or fileUrl or imageUrl or previewUrl
-    final_file_url = resolved_url
-    final_preview_url = previewUrl or imageUrl
-    
+    # Priorité : documentUrlString/fileUrl -> téléchargement externe, image uploadée -> preview
+    download_url = documentUrlString or fileUrl
+    preview_url = previewUrl or imageUrl
+
     if file:
-        uploaded_url = await storage.upload_file(file, folder="library")
-        if uploaded_url: final_file_url = uploaded_url
-        
-    if not final_file_url and not final_preview_url:
+        uploaded_url = await storage.upload_document_cover(file, folder="library")
+        if uploaded_url:
+            preview_url = uploaded_url
+
+    if not download_url and not preview_url:
         from fastapi import HTTPException
-        raise HTTPException(400, "Vous devez fournir soit un fichier soit un URL.")
+        raise HTTPException(400, "Vous devez fournir au moins une image de couverture ou un lien vers le document.")
     
+    is_premium = accessType == 'PREMIUM'
     author_metadata = {"name": author} if author else None
     
     doc = Document(
         title=title,
         category=category or domain or "Général",
+        isPremium=is_premium,
         price=price,
         description=description,
         pagesCount=pagesCount,
@@ -106,8 +109,8 @@ async def publish_document(
         edition=edition,
         referenceKey=referenceKey,
         tags=tags.split(',') if tags else None,
-        fileUrl=final_file_url,
-        previewUrl=final_preview_url,
+        fileUrl=download_url,
+        previewUrl=preview_url,
         authorId=current_admin.id,
         status="APPROVED"
     )

@@ -4,7 +4,7 @@ from sqlalchemy import or_
 from typing import Any, Optional
 import json
 from app.api.dependencies.auth import get_db, get_current_user, get_current_active_user
-from app.models.user import User, Experience, Education, StatusEnum, RoleEnum
+from app.models.user import User, Experience, Education, StatusEnum, RoleEnum, RoleTypeEnum
 from app.models.network import Connection, ConnectionStatusEnum, ConnectionTypeEnum
 from app.schemas.user import UserResponse, ExperienceCreate, ExperienceUpdate, ExperienceResource, EducationCreate, EducationUpdate, EducationResource
 from app.services.storage import storage
@@ -142,15 +142,14 @@ def get_premium_certified_mentors(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_active_user),
 ):
-    if not current_user.isPremium and current_user.role.value != "ADMIN":
+    if not current_user.isPremium and current_user.role.value not in ("ADMIN", "SUPER_ADMIN"):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="L'accès à cette liste est strictement réservé aux membres Premium.")
 
     users = (
         db.query(User)
         .filter(
-            User.roleType == "professional",
+            User.roleType == RoleTypeEnum.professional,
             User.nineaUploaded == True,
-            User.isPremium == True,
             User.role != RoleEnum.ADMIN,
             User.role != RoleEnum.SUPER_ADMIN,
         )
