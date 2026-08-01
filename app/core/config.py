@@ -42,7 +42,7 @@ class Settings(BaseSettings):
         "http://127.0.0.1:5173",
         "http://localhost:3000",
         "http://127.0.0.1:3000",
-        "https://lereseau-livid.vercel.app"
+        "https://lereseau-livid.vercel.app",
         "https://lereseau.site",
         "https://www.lereseau.site"
     ]
@@ -56,7 +56,7 @@ class Settings(BaseSettings):
     MAIL_USERNAME: str = "lereseau2026@gmail.com"
     MAIL_PASSWORD: str = "VOTRE_APP_PASSWORD_ICI"
     MAIL_FROM: str = "lereseau2026@gmail.com"
-    MAIL_FROM_NAME: str = "LeRéseau — No Reply"
+    MAIL_FROM_NAME: str = "LeRéseau"
     MAIL_PORT: int = 587
     MAIL_SERVER: str = "smtp.gmail.com"
     MAIL_STARTTLS: bool = True
