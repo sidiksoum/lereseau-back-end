@@ -55,7 +55,7 @@ class Settings(BaseSettings):
     # ─── SMTP — Email noreply ──────────────────────────────────────────────────
     MAIL_USERNAME: str = "lereseau2026@gmail.com"
     MAIL_PASSWORD: str = "VOTRE_APP_PASSWORD_ICI"
-    MAIL_FROM: str = "lereseau2026@gmail.com"
+    MAIL_FROM: str = "noreply@mail.lereseau.site"
     MAIL_FROM_NAME: str = "LeRéseau"
     MAIL_PORT: int = 587
     MAIL_SERVER: str = "smtp.gmail.com"
@@ -65,8 +65,13 @@ class Settings(BaseSettings):
     VALIDATE_CERTS: bool = True
     OTP_EXPIRE_MINUTES: int = 10
     
-    # MailerSend (Production Email Service via API)
-    MAILERSEND_API_KEY: Optional[str] = None
+    # Brevo (Sendinblue) — Transactional Email API
+    # Configure `BREVO_API_KEY` in your .env for production sending
+    BREVO_API_KEY: Optional[str] = None
+
+    # Optional override sender for Brevo API (falls back to MAIL_FROM)
+    BREVO_SENDER_EMAIL: Optional[str] = None
+    BREVO_SENDER_NAME: Optional[str] = None
 
     # VAPID Keys for Web Push
     VAPID_PUBLIC_KEY: str = "BCqd9LIoVZbHi6yh5GAa4h24u59NUsD5sK2As6Bp-Hui78psNRDqcSCon12QJ6qruP1GJ-ck92SVXYJY6STB23k"

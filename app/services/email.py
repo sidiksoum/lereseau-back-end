@@ -57,43 +57,44 @@ def compute_expiry() -> datetime:
     return datetime.now(timezone.utc) + timedelta(minutes=settings.OTP_EXPIRE_MINUTES)
 
 
-# ─── MailerSend API Client ───────────────────────────────────────────────────
+# ─── Brevo (Sendinblue) API Client ───────────────────────────────────────────
 
 async def send_email_api(to_email: str, to_name: str, subject: str, html_body: str) -> bool:
     """
-    Envoie un email en utilisant l'API HTTPS de MailerSend (évite le blocage des ports SMTP).
+    Envoie un email en utilisant l'API HTTPS de Brevo (anciennement Sendinblue).
     """
-    url = "https://api.mailersend.com/v1/email"
+    url = "https://api.brevo.com/v3/smtp/email"
     headers = {
-        "Authorization": f"Bearer {settings.MAILERSEND_API_KEY}",
+        "api-key": settings.BREVO_API_KEY or "",
         "Content-Type": "application/json",
     }
     payload = {
-        "from": {
-            "email": settings.MAIL_FROM,
-            "name": settings.MAIL_FROM_NAME
+        "sender": {
+            "email": settings.BREVO_SENDER_EMAIL or settings.MAIL_FROM,
+            "name": settings.BREVO_SENDER_NAME or settings.MAIL_FROM_NAME,
         },
         "to": [
             {
                 "email": to_email,
-                "name": to_name
+                "name": to_name,
             }
         ],
         "subject": subject,
-        "html": html_body
+        "htmlContent": html_body,
     }
-    
+
     try:
         async with httpx.AsyncClient() as client:
             response = await client.post(url, headers=headers, json=payload, timeout=10.0)
-            if response.status_code in [200, 202]:
-                print(f"[MAILERSEND] Email envoyé avec succès à {to_email} (Status: {response.status_code})")
+            # Brevo returns 201 on success for transactional send
+            if response.status_code in [200, 201, 202]:
+                print(f"[BREVO] Email envoyé avec succès à {to_email} (Status: {response.status_code})")
                 return True
             else:
-                print(f"[MAILERSEND ERROR] Échec de l'envoi à {to_email} : {response.status_code} - {response.text}")
+                print(f"[BREVO ERROR] Échec de l'envoi à {to_email} : {response.status_code} - {response.text}")
                 return False
     except Exception as e:
-        print(f"[MAILERSEND ERROR] Erreur lors de l'envoi de l'email : {e}")
+        print(f"[BREVO ERROR] Erreur lors de l'envoi de l'email : {e}")
         return False
 
 
@@ -117,12 +118,12 @@ async def send_otp_verification_email(
     
     subject = "🔐 Votre code de vérification LeRéseau"
 
-    # Si la clé API de MailerSend est configurée, on l'utilise en priorité
-    if settings.MAILERSEND_API_KEY and settings.MAILERSEND_API_KEY.strip():
+    # Si la clé API de Brevo est configurée, on l'utilise en priorité
+    if settings.BREVO_API_KEY and settings.BREVO_API_KEY.strip():
         await send_email_api(to_email, first_name_str, subject, html_body)
     else:
         # Fallback sur l'envoi SMTP (utile pour les tests locaux)
-        print("[EMAIL] MailerSend non configuré, utilisation du fallback SMTP...")
+        print("[EMAIL] Brevo non configuré, utilisation du fallback SMTP...")
         message = MessageSchema(
             subject=subject,
             recipients=[to_email],
@@ -152,10 +153,10 @@ async def send_password_reset_email(
     
     subject = "🔑 Réinitialisation de votre mot de passe LeRéseau"
 
-    if settings.MAILERSEND_API_KEY and settings.MAILERSEND_API_KEY.strip():
+    if settings.BREVO_API_KEY and settings.BREVO_API_KEY.strip():
         await send_email_api(to_email, first_name_str, subject, html_body)
     else:
-        print("[EMAIL] MailerSend non configuré, utilisation du fallback SMTP...")
+        print("[EMAIL] Brevo non configuré, utilisation du fallback SMTP...")
         message = MessageSchema(
             subject=subject,
             recipients=[to_email],
